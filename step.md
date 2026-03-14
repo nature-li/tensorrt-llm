@@ -41,3 +41,6 @@ cd /workspace/third_party/tokenizers-cpp
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
+
+## 再 build 一个 INT8 engine
+bash step_8_build_int8_engine.sh

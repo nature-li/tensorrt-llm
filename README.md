@@ -1,8 +1,8 @@
 # TensorRT-LLM C++ Executor 推理 Demo
 
-基于 TensorRT-LLM C++ Executor API 实现的 LLM 推理 demo，覆盖模型下载、引擎构建、tokenizer 集成到批量性能基准的完整流程。
+基于 TensorRT-LLM C++ Executor API 实现的 LLM 推理 demo，覆盖模型下载、引擎构建、tokenizer 集成到 FP16/INT8 批量性能对比的完整流程。
 
-**环境：** RTX 5060 Ti · CUDA 13.0 · TensorRT-LLM 1.2.0rc6 · Qwen2.5-3B-Instruct FP16
+**环境：** RTX 5060 Ti · CUDA 13.0 · TensorRT-LLM 1.2.0rc6 · Qwen2.5-3B-Instruct
 
 ---
 
@@ -23,13 +23,21 @@ bash step_1_download_model.sh
 ### 3. 转换 checkpoint
 
 ```bash
+# FP16
 bash step_2_transport.sh
+
+# INT8（SmoothQuant）
+bash step_8_convert_int8.sh
 ```
 
 ### 4. 构建 TensorRT Engine
 
 ```bash
+# FP16
 bash step_3_build_engine.sh
+
+# INT8
+bash step_9_build_int8_engine.sh
 ```
 
 ### 5. 验证 Engine
@@ -86,27 +94,54 @@ make -j$(nproc)
 ## 运行
 
 ```bash
-# 单条推理
-./infer ../engines/qwen25_3b_fp16 1
+# FP16
+./infer ../engines/qwen25_3b_fp16 <batch_size>
 
-# 批量推理（batch_size = 4）
-./infer ../engines/qwen25_3b_fp16 4
+# INT8
+./infer ../engines/qwen25_3b_int8 <batch_size>
 ```
 
 ---
 
 ## 推理性能基准
 
-测试设备：RTX 5060 Ti · Qwen2.5-3B-Instruct FP16 · max_new_tokens=64
+测试设备：RTX 5060 Ti · Qwen2.5-3B-Instruct · max_new_tokens=64
 
-![批量推理基准](docs/basic_benchmark.svg)
+### FP16
 
-| 批大小 | TTFT (ms) | TPOT (ms) | 吞吐量 (tokens/s) | 总耗时 |
-|-------:|----------:|----------:|------------------:|-------:|
-| 1      | 167       | 17.1      | 51.5              | 1243ms |
-| 2      | 160       | 17.3      | 102.2             | 1252ms |
-| 4      | 164       | 17.2      | 205.5             | 1246ms |
-| 8      | 793       | 26.8      | 206.3             | 2482ms |
-| 16     | 1816      | 43.0      | 226.4             | 4522ms |
+| 批大小 | TTFT (ms) | TPOT (ms) | 吞吐量 (t/s) |
+|-------:|----------:|----------:|-------------:|
+| 1      | 167       | 17.1      | 51.5         |
+| 2      | 160       | 17.3      | 102.2        |
+| 4      | 164       | 17.2      | 205.5        |
+| 8      | 793       | 26.8      | 206.3        |
+| 16     | 1816      | 43.0      | 226.4        |
 
-**结论：** batch=4 是该显卡的最优工作点。batch 1→4 吞吐近似线性扩展（4×），TTFT 和 TPOT 几乎不变；batch 超过 4 后 GPU 打满，吞吐不再增长，TTFT 从 164ms 暴涨至 793ms。
+**饱和点：batch=4**，超过后吞吐不再增长，TTFT 暴涨。
+
+### INT8（SmoothQuant）
+
+| 批大小 | TTFT (ms) | TPOT (ms) | 吞吐量 (t/s) |
+|-------:|----------:|----------:|-------------:|
+| 4      | 474       | 12.8      | 199.7        |
+| 8      | 171       | 11.9      | 555.9        |
+| 12     | 171       | 11.0      | 892.0        |
+| 14     | 169       | 11.0      | 1037.0       |
+| 16     | 171       | 11.1      | **1179.7**   |
+| 18     | 250       | 21.0      | 731.4        |
+| 20     | 322       | 20.8      | 784.3        |
+
+**饱和点：batch=16**，吞吐峰值 1179 t/s。
+
+### FP16 vs INT8 对比（batch=4）
+
+| 精度 | TTFT (ms) | TPOT (ms) | 吞吐量 (t/s) | 峰值吞吐 (t/s) | 饱和 batch |
+|------|----------:|----------:|-------------:|---------------:|-----------:|
+| FP16 | 164       | 17.2      | 205.5        | 226.4          | 4          |
+| INT8 | 474       | 12.8      | 199.7        | **1179.7**     | 16         |
+
+**结论：**
+- INT8 峰值吞吐是 FP16 的 **5.2×**（1179 vs 226 t/s），饱和点从 batch=4 推迟到 batch=16
+- INT8 的 TPOT 更低（11ms vs 17ms），decode 阶段更快，适合高并发场景
+- INT8 在低 batch（=4）时 TTFT 反而更高（474ms vs 164ms），prefill 阶段有额外量化开销
+- 延迟敏感场景（单请求）用 FP16；吞吐优先场景（高并发服务）用 INT8
