@@ -47,11 +47,17 @@ bash step_8_convert_int8.sh
 bash step_9_build_engine_int8.sh
 
 ## 编译 jsoncpp
+cd third_party/jsoncpp
+git apply ../../patches/jsoncpp-cxx17.patch
 cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/workspace/third_party/local \
     -DBUILD_SHARED_LIBS=OFF \
-    -DJSONCPP_WITH_TESTS=OFF
+    -DJSONCPP_WITH_TESTS=OFF \
+    -DCMAKE_CXX_STANDARD=17 \
+    -DCMAKE_CXX_FLAGS="-std=c++17 -DJSONCPP_USE_CPLUSPLUS17"
+make -j
+make install
 
 
 ## 编译安装 dragon
@@ -61,3 +67,5 @@ cmake .. \
     -DBUILD_CTL=OFF \
     -DCMAKE_PREFIX_PATH=/workspace/third_party/local \
     -DCMAKE_INSTALL_PREFIX=/workspace/third_party/local
+make -j
+make install

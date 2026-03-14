@@ -31,7 +31,6 @@ set(TRTLLM_LINK_LIBS
 set(COMMON_INCLUDE_DIRS
     ${TOKENIZERS_DIR}/include
     ${DROGON_LOCAL}/include
-    /usr/include/jsoncpp
 )
 
 # ── benchmark 推理程序 ──────────────────────────────────────
