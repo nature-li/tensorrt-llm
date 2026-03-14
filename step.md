@@ -49,7 +49,7 @@ bash step_9_build_engine_int8.sh
 ## 编译 jsoncpp
 cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX=~/code/tensorrt-llm/third_party/local \
+    -DCMAKE_INSTALL_PREFIX=/workspace/third_party/local \
     -DBUILD_SHARED_LIBS=OFF \
     -DJSONCPP_WITH_TESTS=OFF
 
@@ -59,5 +59,5 @@ cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_EXAMPLES=OFF \
     -DBUILD_CTL=OFF \
-    -DCMAKE_PREFIX_PATH=~/code/tensorrt-llm/third_party/local \
-    -DCMAKE_INSTALL_PREFIX=~/code/tensorrt-llm/third_party/local
+    -DCMAKE_PREFIX_PATH=/workspace/third_party/local \
+    -DCMAKE_INSTALL_PREFIX=/workspace/third_party/local
