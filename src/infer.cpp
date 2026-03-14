@@ -44,6 +44,9 @@ int main(int argc, char** argv) {
    */
   VecTokens output_tokens;
   bool done = false;
+  bool first_token = false;
+  std::chrono::high_resolution_clock::time_point t_first;
+
   while (!done) {
     auto response =
         executor.awaitResponses(req_id, std::chrono::milliseconds(200));
@@ -56,6 +59,11 @@ int main(int argc, char** argv) {
       const auto& res = r.getResult();
       if (!res.outputTokenIds.empty()) {
         const auto& beam0 = res.outputTokenIds[0];
+        // 记录第一个 token 的时间
+        if (!first_token && !beam0.empty()) {
+          t_first = std::chrono::high_resolution_clock::now();
+          first_token = true;
+        }
         output_tokens.insert(output_tokens.end(), beam0.begin(), beam0.end());
       }
 
@@ -64,16 +72,26 @@ int main(int argc, char** argv) {
   }
 
   auto t1 = std::chrono::high_resolution_clock::now();
-  auto ms =
+  // time to first token
+  auto ttfs_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(t_first - t0)
+          .count();
+  auto total_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+  // time per output token
+  auto tpot_ms = output_tokens.size() > 1
+                     ? (total_ms - ttfs_ms) / (double)(output_tokens.size() - 1)
+                     : 0.0;
 
   /**
    * 打印结果
    */
-  std::cout << "Generated " << output_tokens.size() << " tokens\n";
-  std::cout << "Time: " << ms << " ms\n";
-  std::cout << "Throughput: " << output_tokens.size() * 1000.0 / ms
+  std::cout << "TTFT: " << ttfs_ms << " ms\n";
+  std::cout << "TPOT: " << tpot_ms << " ms\n";
+  std::cout << "Throughput: " << output_tokens.size() * 1000.0 / total_ms
             << " tokens/s\n";
+  std::cout << "Generated " << output_tokens.size() << " tokens\n";
+  std::cout << "Time: " << total_ms << " ms\n";
   std::cout << "Token ids: ";
   for (const auto& t : output_tokens) {
     std::cout << t << " ";
