@@ -47,8 +47,9 @@ bash step_8_convert_int8.sh
 bash step_9_build_engine_int8.sh
 
 ## 编译 jsoncpp
-cd third_party/jsoncpp
-git apply ../../patches/jsoncpp-cxx17.patch
+cd /workspace/third_party/jsoncpp
+git apply /workspace/patches/jsoncpp-cxx17.patch
+mkdir -p build && cd build
 cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/workspace/third_party/local \
@@ -59,8 +60,13 @@ cmake .. \
 make -j
 make install
 
+## 安装依赖
+apt-get update 
+apt-get install uuid-dev
 
 ## 编译安装 dragon
+cd /workspace/third_party/drogon
+mkdir -p build && cd build
 cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_EXAMPLES=OFF \

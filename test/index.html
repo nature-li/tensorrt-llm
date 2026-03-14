@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>TensorRT-LLM 推理测试</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; background: #f5f5f5; padding: 24px; }
+.container { max-width: 720px; margin: 0 auto; }
+h1 { font-size: 18px; font-weight: 500; margin-bottom: 20px; color: #222; }
+.card { background: #fff; border: 0.5px solid #ddd; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+label { font-size: 13px; color: #666; display: block; margin-bottom: 6px; }
+textarea { width: 100%; border: 0.5px solid #ddd; border-radius: 8px; padding: 10px 12px; font-size: 14px; resize: vertical; outline: none; font-family: inherit; }
+textarea:focus { border-color: #999; }
+.params { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 12px; }
+input[type=number] { width: 100%; border: 0.5px solid #ddd; border-radius: 8px; padding: 8px 12px; font-size: 14px; outline: none; }
+input[type=number]:focus { border-color: #999; }
+.row { display: flex; gap: 10px; margin-top: 14px; align-items: center; }
+input[type=text] { flex: 1; border: 0.5px solid #ddd; border-radius: 8px; padding: 8px 12px; font-size: 13px; outline: none; }
+input[type=text]:focus { border-color: #999; }
+button { padding: 8px 20px; border-radius: 8px; border: 0.5px solid #ddd; background: #fff; font-size: 14px; cursor: pointer; }
+button:hover { background: #f0f0f0; }
+button.primary { background: #222; color: #fff; border-color: #222; }
+button.primary:hover { background: #444; }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+.output { min-height: 120px; font-size: 14px; line-height: 1.7; color: #222; white-space: pre-wrap; word-break: break-all; }
+.output.placeholder { color: #aaa; }
+.metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 4px; }
+.metric { background: #f8f8f8; border-radius: 8px; padding: 10px 12px; }
+.metric-label { font-size: 11px; color: #999; margin-bottom: 4px; }
+.metric-value { font-size: 18px; font-weight: 500; color: #222; }
+.metric-unit { font-size: 11px; color: #999; }
+.status { font-size: 12px; color: #999; margin-top: 8px; }
+.status.running { color: #1a7a4a; }
+.status.error { color: #c0392b; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>TensorRT-LLM 推理测试</h1>
+
+  <div class="card">
+    <label>服务地址</label>
+    <div class="row" style="margin-top:0">
+      <input type="text" id="server-url" value="http://localhost:8080" placeholder="http://localhost:8080">
+      <button onclick="checkHealth()">健康检查</button>
+    </div>
+    <div class="status" id="health-status"></div>
+  </div>
+
+  <div class="card">
+    <label>Prompt</label>
+    <textarea id="prompt" rows="4" placeholder="输入你的问题...">用中文介绍一下你自己</textarea>
+    <div class="params">
+      <div>
+        <label>max_new_tokens</label>
+        <input type="number" id="max-tokens" value="64" min="1" max="512">
+      </div>
+      <div>
+        <label>temperature</label>
+        <input type="number" id="temperature" value="0.8" min="0" max="2" step="0.1">
+      </div>
+      <div>
+        <label>top_p</label>
+        <input type="number" id="top-p" value="0.9" min="0" max="1" step="0.05">
+      </div>
+    </div>
+    <div class="row">
+      <button class="primary" id="send-btn" onclick="sendRequest()">发送</button>
+      <button id="stop-btn" onclick="stopRequest()" disabled>停止</button>
+      <span class="status" id="req-status"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>输出</label>
+    <div class="output placeholder" id="output">等待输入...</div>
+  </div>
+
+  <div class="card">
+    <label>性能指标</label>
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-label">TTFT</div>
+        <div class="metric-value" id="m-ttft">--</div>
+        <div class="metric-unit">ms</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">TPOT</div>
+        <div class="metric-value" id="m-tpot">--</div>
+        <div class="metric-unit">ms/token</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">吞吐量</div>
+        <div class="metric-value" id="m-tps">--</div>
+        <div class="metric-unit">tokens/s</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">生成 tokens</div>
+        <div class="metric-value" id="m-tokens">--</div>
+        <div class="metric-unit">个</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function checkHealth() {
+  const url = document.getElementById('server-url').value.trim();
+  const el = document.getElementById('health-status');
+  el.className = 'status';
+  el.textContent = '检查中...';
+  try {
+    const resp = await fetch(url + '/health');
+    const data = await resp.json();
+    el.className = 'status running';
+    el.textContent = '✓ 服务正常：' + JSON.stringify(data);
+  } catch(e) {
+    el.className = 'status error';
+    el.textContent = '✗ 无法连接：' + e.message;
+  }
+}
+
+function stopRequest() {
+  if (window._reader) { window._reader.cancel(); window._reader = null; }
+  setRunning(false);
+}
+
+function setRunning(running) {
+  document.getElementById('send-btn').disabled = running;
+  document.getElementById('stop-btn').disabled = !running;
+  document.getElementById('req-status').className = 'status' + (running ? ' running' : '');
+  document.getElementById('req-status').textContent = running ? '生成中...' : '';
+}
+
+function sendRequest() {
+  const url    = document.getElementById('server-url').value.trim();
+  const prompt = document.getElementById('prompt').value.trim();
+  const maxTok = parseInt(document.getElementById('max-tokens').value);
+  const temp   = parseFloat(document.getElementById('temperature').value);
+  const topP   = parseFloat(document.getElementById('top-p').value);
+
+  if (!prompt) return;
+
+  const outEl = document.getElementById('output');
+  outEl.className = 'output';
+  outEl.textContent = '';
+  ['m-ttft','m-tpot','m-tps','m-tokens'].forEach(id => {
+    document.getElementById(id).textContent = '--';
+  });
+  setRunning(true);
+
+  fetch(url + '/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      prompt,
+      max_new_tokens: maxTok,
+      temperature: temp,
+      top_p: topP,
+    })
+  }).then(resp => {
+    const reader = resp.body.getReader();
+    window._reader = reader;
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    function read() {
+      reader.read().then(({ done, value }) => {
+        if (done) { setRunning(false); return; }
+        buf += decoder.decode(value, { stream: true });
+        const parts = buf.split('\n\n');
+        buf = parts.pop();
+        for (const part of parts) {
+          if (!part.startsWith('data: ')) continue;
+          try {
+            const json = JSON.parse(part.slice(6));
+            if (json.delta) {
+              outEl.textContent += json.delta;
+            }
+            if (json.done) {
+              document.getElementById('m-ttft').textContent   = json.ttft_ms;
+              document.getElementById('m-tpot').textContent   = json.tpot_ms.toFixed(1);
+              document.getElementById('m-tps').textContent    = json.throughput.toFixed(1);
+              document.getElementById('m-tokens').textContent = json.num_tokens;
+              setRunning(false);
+            }
+            if (json.error) {
+              outEl.textContent += '\n[错误] ' + json.error;
+              setRunning(false);
+            }
+          } catch(e) {}
+        }
+        read();
+      });
+    }
+    read();
+  }).catch(e => {
+    outEl.textContent = '[请求失败] ' + e.message;
+    setRunning(false);
+  });
+}
+</script>
+</body>
+</html>
