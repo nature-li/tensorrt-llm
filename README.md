@@ -22,3 +22,22 @@ bash step_6_generate_cmake.sh
 ## 在容器内检测运行环境
 bash step_7_check_runtime.sh
 
+## 安装 tokenizer 模块
+cd /workspace
+mkdir -p third_party
+git clone https://github.com/mlc-ai/tokenizers-cpp.git third_party/tokenizers-cpp
+cd third_party/tokenizers-cpp
+git submodule update --init --recursive
+
+## 安装 rust
+export RUSTUP_DIST_SERVER=https://mirrors.ustc.edu.cn/rust-static
+export RUSTUP_UPDATE_ROOT=https://mirrors.ustc.edu.cn/rust-static/rustup
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env
+rustc --version
+
+## 编译 tokenizer
+cd /workspace/third_party/tokenizers-cpp
+mkdir -p build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)

@@ -1,8 +1,10 @@
 #include <tensorrt_llm/executor/executor.h>
 #include <tensorrt_llm/plugins/api/tllmPlugin.h>
+#include <tokenizers_cpp.h>
 
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 
 using namespace tensorrt_llm::executor;
@@ -22,10 +24,17 @@ int main(int argc, char** argv) {
   Executor executor(argv[1], ModelType::kENCODER_ONLY, executor_config);
 
   /**
-   * 测试 prompt
-   * "Hello, who are you?" 的 Qwen2.5 tokenization
+   * 加载 tokenizer
    */
-  VecTokens input_ids = {9707, 11, 889, 553, 498, 30};
+  std::ifstream f("/workspace/models/Qwen2.5-3B-Instruct/tokenizer.json");
+  std::string json((std::istreambuf_iterator<char>(f)),
+                   std::istreambuf_iterator<char>());
+  auto tokenizer = tokenizers::Tokenizer::FromBlobJSON(json);
+
+  /**
+   * 测试 prompt
+   */
+  VecTokens input_ids = tokenizer->Encode("Hello, who are you?");
   SamplingConfig sampling(1);
   sampling.setTopK(50);
   sampling.setTopP(0.9f);
@@ -84,6 +93,11 @@ int main(int argc, char** argv) {
                      : 0.0;
 
   /**
+   * decode
+   */
+  auto text = tokenizer->Decode(output_tokens);
+
+  /**
    * 打印结果
    */
   std::cout << "TTFT: " << ttfs_ms << " ms\n";
@@ -96,6 +110,7 @@ int main(int argc, char** argv) {
   for (const auto& t : output_tokens) {
     std::cout << t << " ";
   }
+  std::cout << "Token decode: " << text << "\n";
   std::cout << "\n";
   return 0;
 }
