@@ -1,7 +1,6 @@
 docker run -it --rm \
     --gpus all \
     --name trtllm_dev \
-    --user $(id -u):$(id -g) \
     --network host \
     -v $(pwd):/workspace \
     -w /workspace \

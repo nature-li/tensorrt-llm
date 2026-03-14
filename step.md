@@ -43,4 +43,21 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
 
 ## 再 build 一个 INT8 engine
-bash step_8_build_int8_engine.sh
+bash step_8_convert_int8.sh
+bash step_9_build_engine_int8.sh
+
+## 编译 jsoncpp
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=~/code/tensorrt-llm/third_party/local \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DJSONCPP_WITH_TESTS=OFF
+
+
+## 编译安装 dragon
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_EXAMPLES=OFF \
+    -DBUILD_CTL=OFF \
+    -DCMAKE_PREFIX_PATH=~/code/tensorrt-llm/third_party/local \
+    -DCMAKE_INSTALL_PREFIX=~/code/tensorrt-llm/third_party/local

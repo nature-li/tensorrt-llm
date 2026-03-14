@@ -1,3 +1,9 @@
 [submodule "third_party/tokenizers-cpp"]
 	path = third_party/tokenizers-cpp
 	url = https://github.com/mlc-ai/tokenizers-cpp.git
+[submodule "third_party/drogon"]
+	path = third_party/drogon
+	url = https://github.com/drogonframework/drogon.git
+[submodule "third_party/jsoncpp"]
+	path = third_party/jsoncpp
+	url = https://github.com/open-source-parsers/jsoncpp.git
