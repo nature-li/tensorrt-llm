@@ -13,20 +13,10 @@ bash step_3_build_engine.sh
 ## 在容器内验证 engine
 bash step_4_verify_engine.sh
 
-## 在容器内验证 c++ 环境
-bash step_5_check_cpp.sh
-
-## 在容器内生成 CMakeLists.txt
-bash step_6_generate_cmake.sh
-
 ## 在容器内检测运行环境
 bash step_7_check_runtime.sh
 
 ## 安装 tokenizer 模块
-cd /workspace
-mkdir -p third_party
-git clone https://github.com/mlc-ai/tokenizers-cpp.git third_party/tokenizers-cpp
-cd third_party/tokenizers-cpp
 git submodule update --init --recursive
 
 ## 安装 rust
@@ -41,3 +31,16 @@ cd /workspace/third_party/tokenizers-cpp
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
+
+## 编译
+mkdir build
+cd build
+cmake ..
+make -j
+
+## 运行
+./infer ../engines/qwen25_3b_fp16
+
+## 推理性能基准
+![批量推理基准](docs/basic_benchmark.svg)
+

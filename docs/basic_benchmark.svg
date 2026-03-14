@@ -1,0 +1,160 @@
+<svg width="100%" viewBox="0 0 680 520" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <style>
+      text { font-family: sans-serif; fill: #3d3d3a; }
+      .th { font-size: 14px; font-weight: 500; }
+      .t  { font-size: 14px; font-weight: 400; }
+      .ts { font-size: 12px; font-weight: 400; }
+    </style>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="680" height="520" fill="#ffffff" rx="8"/>
+
+  <!-- 标题 -->
+  <text class="th" x="340" y="32" text-anchor="middle">TensorRT-LLM C++ Executor 批量推理基准 · Qwen2.5-3B-Instruct FP16</text>
+
+  <!-- ══ 左图：吞吐量 ══ -->
+  <line x1="80" y1="60" x2="80" y2="280" stroke="#888" stroke-width="0.5"/>
+  <line x1="80" y1="280" x2="320" y2="280" stroke="#888" stroke-width="0.5"/>
+  <line x1="78" y1="236" x2="320" y2="236" stroke="#ccc" stroke-width="0.5" stroke-dasharray="3 3"/>
+  <line x1="78" y1="192" x2="320" y2="192" stroke="#ccc" stroke-width="0.5" stroke-dasharray="3 3"/>
+  <line x1="78" y1="148" x2="320" y2="148" stroke="#ccc" stroke-width="0.5" stroke-dasharray="3 3"/>
+  <line x1="78" y1="104" x2="320" y2="104" stroke="#ccc" stroke-width="0.5" stroke-dasharray="3 3"/>
+  <line x1="78" y1="60"  x2="320" y2="60"  stroke="#ccc" stroke-width="0.5" stroke-dasharray="3 3"/>
+
+  <text class="ts" x="72" y="284" text-anchor="end">0</text>
+  <text class="ts" x="72" y="240" text-anchor="end">50</text>
+  <text class="ts" x="72" y="196" text-anchor="end">100</text>
+  <text class="ts" x="72" y="152" text-anchor="end">150</text>
+  <text class="ts" x="72" y="108" text-anchor="end">200</text>
+  <text class="ts" x="72" y="64"  text-anchor="end">250</text>
+  <text class="ts" x="20" y="170" text-anchor="middle" transform="rotate(-90,20,170)">tokens/s</text>
+
+  <rect x="95"  y="235" width="28" height="45"  fill="#1D9E75" opacity="0.85" rx="2"/>
+  <rect x="145" y="190" width="28" height="90"  fill="#1D9E75" opacity="0.85" rx="2"/>
+  <rect x="195" y="99"  width="28" height="181" fill="#1D9E75" opacity="0.85" rx="2"/>
+  <rect x="245" y="99"  width="28" height="181" fill="#1D9E75" opacity="0.85" rx="2"/>
+  <rect x="283" y="81"  width="28" height="199" fill="#0F6E56" opacity="0.85" rx="2"/>
+
+  <text class="ts" x="109" y="230" text-anchor="middle">51.5</text>
+  <text class="ts" x="159" y="185" text-anchor="middle">102</text>
+  <text class="ts" x="209" y="94"  text-anchor="middle">205</text>
+  <text class="ts" x="259" y="94"  text-anchor="middle">206</text>
+  <text class="ts" x="297" y="76"  text-anchor="middle">226</text>
+
+  <text class="ts" x="109" y="296" text-anchor="middle">1</text>
+  <text class="ts" x="159" y="296" text-anchor="middle">2</text>
+  <text class="ts" x="209" y="296" text-anchor="middle">4</text>
+  <text class="ts" x="259" y="296" text-anchor="middle">8</text>
+  <text class="ts" x="297" y="296" text-anchor="middle">16</text>
+  <text class="ts" x="200" y="316" text-anchor="middle">批大小</text>
+  <text class="th" x="200" y="50" text-anchor="middle">吞吐量</text>
+
+  <line x1="223" y1="90" x2="275" y2="62" stroke="#E24B4A" stroke-width="0.8" stroke-dasharray="3 2"/>
+  <text class="ts" x="276" y="59" fill="#A32D2D">吞吐饱和</text>
+
+  <rect x="180" y="354" width="52" height="142" fill="#1D9E75" opacity="0.07" rx="3"/>
+  <text class="ts" x="206" y="350" text-anchor="middle" fill="#0F6E56">最优</text>
+
+  <!-- ══ 右图：延迟 ══ -->
+  <line x1="400" y1="60" x2="400" y2="280" stroke="#888" stroke-width="0.5"/>
+  <line x1="400" y1="280" x2="630" y2="280" stroke="#888" stroke-width="0.5"/>
+  <line x1="398" y1="225" x2="630" y2="225" stroke="#ccc" stroke-width="0.5" stroke-dasharray="3 3"/>
+  <line x1="398" y1="170" x2="630" y2="170" stroke="#ccc" stroke-width="0.5" stroke-dasharray="3 3"/>
+  <line x1="398" y1="115" x2="630" y2="115" stroke="#ccc" stroke-width="0.5" stroke-dasharray="3 3"/>
+  <line x1="398" y1="60"  x2="630" y2="60"  stroke="#ccc" stroke-width="0.5" stroke-dasharray="3 3"/>
+
+  <text class="ts" x="394" y="284" text-anchor="end">0</text>
+  <text class="ts" x="394" y="229" text-anchor="end">500</text>
+  <text class="ts" x="394" y="174" text-anchor="end">1000</text>
+  <text class="ts" x="394" y="119" text-anchor="end">1500</text>
+  <text class="ts" x="394" y="64"  text-anchor="end">2000</text>
+  <text class="ts" x="515" y="316" text-anchor="middle">批大小</text>
+  <text class="ts" x="348" y="170" text-anchor="middle" transform="rotate(-90,348,170)">ms</text>
+
+  <rect x="407" y="262" width="14" height="18"  fill="#378ADD" opacity="0.85" rx="2"/>
+  <rect x="447" y="262" width="14" height="18"  fill="#378ADD" opacity="0.85" rx="2"/>
+  <rect x="487" y="262" width="14" height="18"  fill="#378ADD" opacity="0.85" rx="2"/>
+  <rect x="527" y="193" width="14" height="87"  fill="#185FA5" opacity="0.85" rx="2"/>
+  <rect x="567" y="80"  width="14" height="200" fill="#0C447C" opacity="0.9"  rx="2"/>
+
+  <polyline points="414,205 454,204 494,204 534,162 574,91"
+    fill="none" stroke="#EF9F27" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="414" cy="205" r="3.5" fill="#EF9F27"/>
+  <circle cx="454" cy="204" r="3.5" fill="#EF9F27"/>
+  <circle cx="494" cy="204" r="3.5" fill="#EF9F27"/>
+  <circle cx="534" cy="162" r="3.5" fill="#EF9F27"/>
+  <circle cx="574" cy="91"  r="3.5" fill="#EF9F27"/>
+
+  <text class="ts" x="414" y="296" text-anchor="middle">1</text>
+  <text class="ts" x="454" y="296" text-anchor="middle">2</text>
+  <text class="ts" x="494" y="296" text-anchor="middle">4</text>
+  <text class="ts" x="534" y="296" text-anchor="middle">8</text>
+  <text class="ts" x="574" y="296" text-anchor="middle">16</text>
+
+  <line x1="630" y1="60" x2="630" y2="280" stroke="#888" stroke-width="0.5" opacity="0.5"/>
+  <text class="ts" x="634" y="284" text-anchor="start">0</text>
+  <text class="ts" x="634" y="229" text-anchor="start">12</text>
+  <text class="ts" x="634" y="170" text-anchor="start">25</text>
+  <text class="ts" x="634" y="119" text-anchor="start">37</text>
+  <text class="ts" x="634" y="64"  text-anchor="start">50ms</text>
+  <text class="th" x="515" y="50" text-anchor="middle">延迟</text>
+
+  <!-- 图例 -->
+  <rect x="400" y="332" width="10" height="10" fill="#378ADD" rx="2"/>
+  <text class="ts" x="416" y="341">首个 token 延迟 TTFT（左轴）</text>
+  <line x1="545" y1="337" x2="559" y2="337" stroke="#EF9F27" stroke-width="2"/>
+  <circle cx="552" cy="337" r="3" fill="#EF9F27"/>
+  <text class="ts" x="565" y="341">TPOT（右轴）</text>
+
+  <!-- ══ 汇总表格 ══ -->
+  <rect x="40" y="360" width="600" height="28" fill="#f1efe8" rx="4"/>
+  <text class="th" x="100" y="379" text-anchor="middle">批大小</text>
+  <text class="th" x="220" y="379" text-anchor="middle">TTFT (ms)</text>
+  <text class="th" x="340" y="379" text-anchor="middle">TPOT (ms)</text>
+  <text class="th" x="460" y="379" text-anchor="middle">吞吐量</text>
+  <text class="th" x="570" y="379" text-anchor="middle">总耗时</text>
+
+  <line x1="40" y1="388" x2="640" y2="388" stroke="#ccc" stroke-width="0.5"/>
+  <text class="t" x="100" y="403" text-anchor="middle">1</text>
+  <text class="t" x="220" y="403" text-anchor="middle">167</text>
+  <text class="t" x="340" y="403" text-anchor="middle">17.1</text>
+  <text class="t" x="460" y="403" text-anchor="middle">51.5 t/s</text>
+  <text class="t" x="570" y="403" text-anchor="middle">1243 ms</text>
+
+  <line x1="40" y1="410" x2="640" y2="410" stroke="#ccc" stroke-width="0.5" opacity="0.5"/>
+  <rect x="40" y="411" width="600" height="18" fill="#f1efe8" opacity="0.4"/>
+  <text class="t" x="100" y="424" text-anchor="middle">2</text>
+  <text class="t" x="220" y="424" text-anchor="middle">160</text>
+  <text class="t" x="340" y="424" text-anchor="middle">17.3</text>
+  <text class="t" x="460" y="424" text-anchor="middle">102.2 t/s</text>
+  <text class="t" x="570" y="424" text-anchor="middle">1252 ms</text>
+
+  <line x1="40" y1="431" x2="640" y2="431" stroke="#ccc" stroke-width="0.5" opacity="0.5"/>
+  <text class="t" x="100" y="445" text-anchor="middle">4</text>
+  <text class="t" x="220" y="445" text-anchor="middle">164</text>
+  <text class="t" x="340" y="445" text-anchor="middle">17.2</text>
+  <text class="t" x="460" y="445" text-anchor="middle">205.5 t/s</text>
+  <text class="t" x="570" y="445" text-anchor="middle">1246 ms</text>
+
+  <line x1="40" y1="452" x2="640" y2="452" stroke="#ccc" stroke-width="0.5" opacity="0.5"/>
+  <rect x="40" y="453" width="600" height="18" fill="#f1efe8" opacity="0.4"/>
+  <text class="t" x="100" y="466" text-anchor="middle">8</text>
+  <text class="t" x="220" y="466" fill="#A32D2D">793</text>
+  <text class="t" x="340" y="466" fill="#A32D2D">26.8</text>
+  <text class="t" x="460" y="466" text-anchor="middle">206.3 t/s</text>
+  <text class="t" x="570" y="466" text-anchor="middle">2482 ms</text>
+
+  <line x1="40" y1="473" x2="640" y2="473" stroke="#ccc" stroke-width="0.5" opacity="0.5"/>
+  <text class="t" x="100" y="487" text-anchor="middle">16</text>
+  <text class="t" x="220" y="487" fill="#A32D2D">1816</text>
+  <text class="t" x="340" y="487" fill="#A32D2D">43.0</text>
+  <text class="t" x="460" y="487" text-anchor="middle">226.4 t/s</text>
+  <text class="t" x="570" y="487" text-anchor="middle">4522 ms</text>
+
+  <line x1="40" y1="494" x2="640" y2="494" stroke="#ccc" stroke-width="0.5"/>
+</svg>
