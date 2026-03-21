@@ -23,7 +23,7 @@ using Callback = std::function<void(const Response&)>;
 class ExecutorWrapper {
  public:
   ExecutorWrapper(const std::string& engine_dir)
-      : executor_(engine_dir, ModelType::kENCODER_ONLY, ExecutorConfig(1)) {
+      : executor_(engine_dir, ModelType::kDECODER_ONLY, ExecutorConfig(1)) {
     poll_thread_ = std::thread([this]() { poolLoop(); });
   }
 

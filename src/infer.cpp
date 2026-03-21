@@ -1,143 +1,156 @@
 #include <tensorrt_llm/executor/executor.h>
 #include <tensorrt_llm/plugins/api/tllmPlugin.h>
-#include <tokenizers_cpp.h>
 
 #include <chrono>
-#include <filesystem>
-#include <fstream>
 #include <iostream>
+#include <map>
+#include <random>
+#include <string>
 
 using namespace tensorrt_llm::executor;
+using Clock = std::chrono::high_resolution_clock;
+using Ms    = std::chrono::milliseconds;
+
+// ── CLI helpers ──────────────────────────────────────────────────────────────
+bool hasFlag(int argc, char** argv, const std::string& key) {
+  for (int i = 1; i < argc; ++i)
+    if (argv[i] == key) return true;
+  return false;
+}
+
+// ── 随机 prompt
+VecTokens make_random_prompt(int length, unsigned seed = 42) {
+  std::mt19937 rng(seed);
+  std::uniform_int_distribution<int> dist(100, 100000);
+  VecTokens tokens(length);
+  for (auto& t : tokens) t = dist(rng);
+  return tokens;
+}
 
 struct RequestResult {
+  Clock::time_point t_enqueue;
+  Clock::time_point t_first;
+  Clock::time_point t_end;
   VecTokens output_tokens;
-  std::chrono::high_resolution_clock::time_point t_first;
   bool first_token_received = false;
   bool done = false;
 };
 
 int main(int argc, char** argv) {
+  // Usage: infer <engine_dir> <batch_size> [--reuse_kv]
   if (argc < 3) {
-    std::cerr << "Usage: " << argv[0] << " <engine_dir> <batch_size>\n";
+    std::cerr << "Usage: " << argv[0]
+              << " <engine_dir> <batch_size> [--reuse_kv]\n";
     return 1;
   }
 
+  const int  batch_size = std::max(1, std::stoi(argv[2]));
+  const bool reuse_kv   = hasFlag(argc, argv, "--reuse_kv");
+  const int  input_len  = 512;
+  const int  output_len = 200;
+
   initTrtLlmPlugins();
 
-  /**
-   * 创建 Executor 对象
-   */
+  // ── Executor ──────────────────────────────────────────────────────────────
+  KvCacheConfig kv_cache_config;
+  kv_cache_config.setEnableBlockReuse(reuse_kv);
+
   ExecutorConfig executor_config(1);
-  Executor executor(argv[1], ModelType::kENCODER_ONLY, executor_config);
+  executor_config.setKvCacheConfig(kv_cache_config);
+  Executor executor(argv[1], ModelType::kDECODER_ONLY, executor_config);
 
-  /**
-   * 加载 tokenizer
-   */
-  std::ifstream f("/workspace/models/Qwen2.5-3B-Instruct/tokenizer.json");
-  std::string json((std::istreambuf_iterator<char>(f)),
-                   std::istreambuf_iterator<char>());
-  auto tokenizer = tokenizers::Tokenizer::FromBlobJSON(json);
+  std::cout << "engine     : " << argv[1] << "\n";
+  std::cout << "batch_size : " << batch_size << "\n";
+  std::cout << "input_len  : " << input_len << "\n";
+  std::cout << "output_len : " << output_len << "\n";
+  std::cout << "reuse_kv   : " << (reuse_kv ? "on" : "off") << "\n\n";
 
-  /**
-   * 测试 prompt
-   */
-  VecTokens input_ids = tokenizer->Encode("Hello, who are you?");
+  // ── Sampling ──────────────────────────────────────────────────────────────
   SamplingConfig sampling(1);
   sampling.setTopK(50);
   sampling.setTopP(0.9f);
   sampling.setTemperature(0.8f);
-  const int32_t max_new_tokens = 64;
 
-  /**
-   * 同时提交 batch_size 个请求
-   */
-  int batch_size = std::stoi(argv[2]);
-  if (batch_size <= 0) {
-    batch_size = 1;
-  }
-  auto t0 = std::chrono::high_resolution_clock::now();
-
+  // ── Enqueue ───────────────────────────────────────────────────────────────
   std::map<IdType, RequestResult> results;
+  Clock::time_point t_wall_start;
+
   for (int i = 0; i < batch_size; i++) {
-    Request req(input_ids, max_new_tokens, true, sampling);
+    // reuse_kv=on：固定 seed，所有请求相同 prompt，触发 prefix cache 命中
+    // reuse_kv=off：seed=i，每个请求不同 prompt
+    unsigned seed = reuse_kv ? 42 : (unsigned)i;
+    VecTokens prompt = make_random_prompt(input_len, seed);
+
+    Request req(prompt, output_len, true, sampling);
+    auto t_enq = Clock::now();
+    if (i == 0) t_wall_start = t_enq;  // wall time 从第一个请求开始
     auto req_id = executor.enqueueRequest(req);
-    results[req_id] = RequestResult{};
+    results[req_id].t_enqueue = t_enq;
   }
 
-  /**
-   * 等待所有请求完成
-   */
+  // ── 收集响应 ──────────────────────────────────────────────────────────────
   int done_count = 0;
   while (done_count < batch_size) {
-    auto responses = executor.awaitResponses(std::chrono::milliseconds(200));
+    auto responses = executor.awaitResponses(Ms(200));
     for (const auto& r : responses) {
       auto req_id = r.getRequestId();
-      auto& res_state = results[req_id];
+      auto& rs    = results[req_id];
 
       if (r.hasError()) {
-        std::cerr << "Error on req " << req_id << ": " << r.getErrorMsg()
-                  << "\n";
+        std::cerr << "Error on req " << req_id << ": "
+                  << r.getErrorMsg() << "\n";
         return 1;
       }
 
       const auto& res = r.getResult();
       if (!res.outputTokenIds.empty()) {
         const auto& beam0 = res.outputTokenIds[0];
-        if (!res_state.first_token_received && !beam0.empty()) {
-          res_state.t_first = std::chrono::high_resolution_clock::now();
-          res_state.first_token_received = true;
+        if (!rs.first_token_received && !beam0.empty()) {
+          rs.t_first = Clock::now();
+          rs.first_token_received = true;
         }
-
-        res_state.output_tokens.insert(res_state.output_tokens.end(),
-                                       beam0.begin(), beam0.end());
+        rs.output_tokens.insert(rs.output_tokens.end(),
+                                beam0.begin(), beam0.end());
       }
 
       if (res.isFinal) {
-        res_state.done = true;
+        rs.t_end = Clock::now();
+        rs.done  = true;
         done_count++;
       }
     }
   }
 
-  /**
-   * 计算时间
-   */
-  auto t1 = std::chrono::high_resolution_clock::now();
-  auto total_ms =
-      std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+  long wall_ms = std::chrono::duration_cast<Ms>(
+                     Clock::now() - t_wall_start).count();
 
-  double avg_ttft = 0;
-  double avg_tpot = 0;
+  // ── 统计 ──────────────────────────────────────────────────────────────────
+  double sum_ttft = 0, sum_tpot = 0;
   int total_tokens = 0;
-  for (auto& [req_id, res_state] : results) {
-    auto ttft_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                       res_state.t_first - t0)
-                       .count();
-    auto tpot_ms = res_state.output_tokens.size() > 1
-                       ? (total_ms - ttft_ms) /
-                             (double)(res_state.output_tokens.size() - 1)
-                       : 0.0;
 
-    avg_ttft += ttft_ms;
-    avg_tpot += tpot_ms;
-    total_tokens += res_state.output_tokens.size();
+  for (auto& [req_id, rs] : results) {
+    long ttft = std::chrono::duration_cast<Ms>(
+                    rs.t_first - rs.t_enqueue).count();
+    long e2e  = std::chrono::duration_cast<Ms>(
+                    rs.t_end   - rs.t_enqueue).count();
+    int  n    = (int)rs.output_tokens.size();
+    double tpot = n > 1 ? (double)(e2e - ttft) / (n - 1) : 0.0;
+
+    sum_ttft     += ttft;
+    sum_tpot     += tpot;
+    total_tokens += n;
   }
-  avg_ttft /= batch_size;
-  avg_tpot /= batch_size;
 
-  std::cout << "=== Batch Size: " << batch_size << " ===\n";
-  std::cout << "Avg TTFT:   " << avg_ttft << " ms\n";
-  std::cout << "Avg TPOT:   " << avg_tpot << " ms/token\n";
-  std::cout << "Throughput: " << total_tokens * 1000.0 / total_ms
-            << " tokens/s\n";
-  std::cout << "Total time: " << total_ms << " ms\n";
+  double avg_ttft   = sum_ttft / batch_size;
+  double avg_tpot   = sum_tpot / batch_size;
+  double throughput = wall_ms ? total_tokens * 1000.0 / wall_ms : 0.0;
+
+  std::cout << "=== Results ===\n";
+  std::cout << "Avg TTFT   : " << avg_ttft   << " ms\n";
+  std::cout << "Avg TPOT   : " << avg_tpot   << " ms/token\n";
+  std::cout << "Throughput : " << throughput  << " tokens/s\n";
+  std::cout << "Wall time  : " << wall_ms     << " ms\n";
   std::cout << "Total tokens: " << total_tokens << "\n";
-
-  // 打印每条请求的解码结果
-  for (auto& [req_id, res_state] : results) {
-    auto text = tokenizer->Decode(res_state.output_tokens);
-    std::cout << "[req " << req_id << "] " << text << "\n";
-  }
 
   return 0;
 }

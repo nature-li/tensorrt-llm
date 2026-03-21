@@ -2,13 +2,31 @@
 
 基于 TensorRT-LLM C++ Executor API 实现的 LLM 推理 demo，覆盖模型下载、引擎构建、tokenizer 集成到 FP16/INT8 批量性能对比的完整流程。
 
-**环境：** RTX 5060 Ti · CUDA 13.0 · TensorRT-LLM 1.2.0rc6 · Qwen2.5-3B-Instruct
+**环境：** RTX 5060 Ti 16GB · CUDA 13.0 · TensorRT-LLM 1.2.0rc6 · Qwen2.5-3B-Instruct
 
 ---
 
-## 快速开始
+## 文件说明
 
-### 1. 进入容器
+| 文件 | 用途 |
+|---|---|
+| `src/infer.cpp` | C++ 推理主程序，支持 FP16/INT8 engine，输出 TTFT/TPOT/Throughput |
+| `step_0_run_docker.sh` | 启动 TensorRT-LLM 容器 |
+| `step_1_download_model.sh` | 下载 Qwen2.5-3B-Instruct 模型 |
+| `step_2_transport.sh` | 转换 FP16 checkpoint |
+| `step_3_build_engine.sh` | 构建 FP16 TensorRT engine |
+| `step_4_verify_engine.sh` | 验证 engine 输出 |
+| `step_5_check_cpp.sh` | 验证 C++ 编译环境 |
+| `step_6_generate_cmake.sh` | 生成 CMakeLists.txt |
+| `step_7_check_runtime.sh` | 检测运行环境 |
+| `step_8_convert_int8.sh` | 转换 INT8 SmoothQuant checkpoint |
+| `step_9_build_engine_int8.sh` | 构建 INT8 TensorRT engine |
+
+---
+
+## 构建流程
+
+### 1. 启动容器
 
 ```bash
 bash step_0_run_docker.sh
@@ -20,69 +38,89 @@ bash step_0_run_docker.sh
 bash step_1_download_model.sh
 ```
 
-### 3. 转换 checkpoint
+### 3. 构建 FP16 engine
 
 ```bash
-# FP16
+# 转换 checkpoint
 bash step_2_transport.sh
 
-# INT8（SmoothQuant）
-bash step_8_convert_int8.sh
-```
-
-### 4. 构建 TensorRT Engine
-
-```bash
-# FP16
+# 构建 engine
 bash step_3_build_engine.sh
 
-# INT8
-bash step_9_build_int8_engine.sh
-```
-
-### 5. 验证 Engine
-
-```bash
+# 验证
 bash step_4_verify_engine.sh
 ```
 
-### 6. 检查运行环境
+### 4. 构建 INT8 engine（SmoothQuant）
 
 ```bash
-bash step_7_check_runtime.sh
+bash step_8_convert_int8.sh
+bash step_9_build_engine_int8.sh
 ```
 
----
-
-## 编译
-
-### 安装 tokenizer 子模块
+### 5. 安装 tokenizers-cpp
 
 ```bash
+cd /workspace
+mkdir -p third_party
+git clone https://github.com/mlc-ai/tokenizers-cpp.git third_party/tokenizers-cpp
+cd third_party/tokenizers-cpp
 git submodule update --init --recursive
-```
 
-### 安装 Rust（使用国内镜像）
-
-```bash
+# 安装 Rust（国内镜像）
 export RUSTUP_DIST_SERVER=https://mirrors.ustc.edu.cn/rust-static
 export RUSTUP_UPDATE_ROOT=https://mirrors.ustc.edu.cn/rust-static/rustup
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source ~/.cargo/env
-```
 
-### 编译 tokenizers-cpp
-
-```bash
+# 编译
 cd /workspace/third_party/tokenizers-cpp
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
 ```
 
-### 编译推理程序
+### 6. 安装 jsoncpp
 
 ```bash
+cd /workspace/third_party/jsoncpp
+git apply /workspace/patches/jsoncpp-cxx17.patch
+mkdir -p build && cd build
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/workspace/third_party/local \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DJSONCPP_WITH_TESTS=OFF \
+    -DCMAKE_CXX_STANDARD=17 \
+    -DCMAKE_CXX_FLAGS="-std=c++17 -DJSONCPP_USE_CPLUSPLUS17"
+make -j
+make install
+```
+
+### 7. 安装 Drogon
+
+```bash
+apt-get update && apt-get install -y uuid-dev
+
+cd /workspace/third_party/drogon
+mkdir -p build && cd build
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_EXAMPLES=OFF \
+    -DBUILD_CTL=OFF \
+    -DCMAKE_PREFIX_PATH=/workspace/third_party/local \
+    -DCMAKE_INSTALL_PREFIX=/workspace/third_party/local
+make -j
+make install
+```
+
+### 8. 编译推理程序
+
+```bash
+bash step_5_check_cpp.sh
+bash step_6_generate_cmake.sh
+bash step_7_check_runtime.sh
+
 cd /workspace
 mkdir -p build && cd build
 cmake ..
@@ -94,54 +132,65 @@ make -j$(nproc)
 ## 运行
 
 ```bash
-# FP16
-./infer ../engines/qwen25_3b_fp16 <batch_size>
+# FP16，batch_size=1
+./infer ../engines/qwen25_3b_fp16_b64 1
 
-# INT8
-./infer ../engines/qwen25_3b_int8 <batch_size>
+# INT8，batch_size=32
+./infer ../engines/qwen25_3b_int8_b64 32
+
+# 开启 prefix cache（所有请求相同 prompt，触发 KV cache 命中）
+./infer ../engines/qwen25_3b_fp16_b64 64 --reuse_kv
 ```
+
+参数说明：
+
+| 参数 | 说明 |
+|---|---|
+| `<engine_dir>` | engine 目录路径 |
+| `<batch_size>` | 同时提交的请求数，范围 1~64 |
+| `--reuse_kv` | 开启 prefix cache，所有请求使用相同 prompt |
 
 ---
 
-## 推理性能基准
+## 性能基准
 
-测试设备：RTX 5060 Ti · Qwen2.5-3B-Instruct · max_new_tokens=64
+测试设备：RTX 5060 Ti 16GB · Qwen2.5-3B-Instruct · input=512 tokens · output=200 tokens
 
 ### FP16
 
-| 批大小 | TTFT (ms) | TPOT (ms) | 吞吐量 (t/s) |
-|-------:|----------:|----------:|-------------:|
-| 1      | 167       | 17.1      | 51.5         |
-| 2      | 160       | 17.3      | 102.2        |
-| 4      | 164       | 17.2      | 205.5        |
-| 8      | 793       | 26.8      | 206.3        |
-| 16     | 1816      | 43.0      | 226.4        |
-
-**饱和点：batch=4**，超过后吞吐不再增长，TTFT 暴涨。
+| Batch | TTFT (ms) | TPOT (ms) | Throughput (t/s) |
+|------:|----------:|----------:|-----------------:|
+| 1     | 215       | 17.5      | 54               |
+| 4     | 364       | 17.3      | 208              |
+| 8     | 653       | 18.0      | 378              |
+| 16    | 1193      | 19.1      | 640              |
+| 32    | 1748      | 22.5      | 1026             |
+| 64    | 2853      | 30.9      | 1416             |
+| 64 + prefix cache | 327 | 21.9 | 2712        |
 
 ### INT8（SmoothQuant）
 
-| 批大小 | TTFT (ms) | TPOT (ms) | 吞吐量 (t/s) |
-|-------:|----------:|----------:|-------------:|
-| 4      | 474       | 12.8      | 199.7        |
-| 8      | 171       | 11.9      | 555.9        |
-| 12     | 171       | 11.0      | 892.0        |
-| 14     | 169       | 11.0      | 1037.0       |
-| 16     | 171       | 11.1      | **1179.7**   |
-| 18     | 250       | 21.0      | 731.4        |
-| 20     | 322       | 20.8      | 784.3        |
+| Batch | TTFT (ms) | TPOT (ms) | Throughput (t/s) |
+|------:|----------:|----------:|-----------------:|
+| 1     | 714       | 11.5      | 66               |
+| 16    | 732       | 12.5      | 991              |
+| 32    | 728       | 14.8      | 1739             |
+| 64    | 1319      | 20.5      | 2360             |
+| 64 + prefix cache | 266 | 15.7 | **3742**    |
 
-**饱和点：batch=16**，吞吐峰值 1179 t/s。
+### FP16 vs INT8 结论
 
-### FP16 vs INT8 对比（batch=4）
+- **延迟敏感（单请求）→ FP16**：TTFT 215ms vs 714ms，低 3.3x；TPOT 相近但 FP16 略差
+- **吞吐优先（高并发）→ INT8**：batch=32 时吞吐 1739 vs 1026 tokens/s，高 69%
+- **INT8 + prefix cache 峰值 3742 tokens/s**，是 FP16 基线（无 cache）的 2.6x
+- **INT8 engine 体积 3.9GB**，较 FP16（6.5GB）减少 40%，释放显存供 KV cache 使用
+- INT8 在低 batch 时 TTFT 反而偏高（prefill 有固定量化开销），但对 batch size 不敏感（batch=1~32 TTFT 稳定在 ~730ms）
 
-| 精度 | TTFT (ms) | TPOT (ms) | 吞吐量 (t/s) | 峰值吞吐 (t/s) | 饱和 batch |
-|------|----------:|----------:|-------------:|---------------:|-----------:|
-| FP16 | 164       | 17.2      | 205.5        | 226.4          | 4          |
-| INT8 | 474       | 12.8      | 199.7        | **1179.7**     | 16         |
+---
 
-**结论：**
-- INT8 峰值吞吐是 FP16 的 **5.2×**（1179 vs 226 t/s），饱和点从 batch=4 推迟到 batch=16
-- INT8 的 TPOT 更低（11ms vs 17ms），decode 阶段更快，适合高并发场景
-- INT8 在低 batch（=4）时 TTFT 反而更高（474ms vs 164ms），prefill 阶段有额外量化开销
-- 延迟敏感场景（单请求）用 FP16；吞吐优先场景（高并发服务）用 INT8
+## 注意事项
+
+- tokenizers-cpp 依赖 Rust，必须先安装 Rust 再编译
+- 国内环境需要配置 Rust 镜像源，否则安装失败
+- INT8 engine 使用 SmoothQuant 量化，转换时需要校准数据集，精度损失较小
+- `--reuse_kv` 测试的是 100% prefix cache 命中的理论上界，实际场景收益取决于请求间共享前缀的比例
